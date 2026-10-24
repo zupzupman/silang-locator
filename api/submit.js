@@ -11,10 +11,9 @@ module.exports = async (req, res) => {
     return res.json({ ok: true });
   }
   const lat = Number(b.lat), lon = Number(b.lon);
-  if (b.lat !== undefined && !(Math.abs(lat) <= 90 && Math.abs(lon) <= 180))
+  if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || (lat === 0 && lon === 0))
     return res.status(400).json({ error: "bad coordinates" });
-  if (b.lat !== undefined) { rec.lat = lat; rec.lon = lon; rec.acc = Math.round(Number(b.acc) || 0); }
-  else rec.purok = String(b.purok || "").slice(0, 30);
+  rec.lat = lat; rec.lon = lon; rec.acc = Math.round(Number(b.acc) || 0);
   rec.status = "received"; rec.received = Date.now();
   await redis.set(key, rec, { ex: 21600 });
   res.json({ ok: true });
