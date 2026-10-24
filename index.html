@@ -17,6 +17,11 @@ button,.btn{display:inline-block;padding:11px 16px;font-size:15px;font-weight:60
 td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line)}.tbl{overflow-x:auto}
 .s{font-weight:600}.s.received{color:var(--ok)}.s.sent{color:var(--mut)}.s.opened{color:#9A6B00}
 #login{max-width:340px;margin:60px auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.top h2{margin:0}
+.ghost{background:#fff;color:var(--red);border:1px solid var(--red);padding:7px 12px;margin:0}
+#modal{display:none;position:fixed;inset:0;background:rgba(18,38,58,.55);align-items:center;justify-content:center;padding:20px;z-index:1000}
+.dlg{background:#fff;border-radius:12px;padding:22px;max-width:380px;width:100%}.dlg h3{margin:0 0 8px;font-size:18px}.dlg p{margin:0 0 18px;color:var(--mut);line-height:1.5}
+.dlg .row{display:flex;gap:10px;justify-content:flex-end}.dlg button{margin:0}
 </style></head><body>
 <header>Silang Alert: locate caller</header>
 <main id="login"><section><h2>Staff sign in</h2>
@@ -29,9 +34,12 @@ td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line)}.tbl{overf
 <button id="gen">Create link</button>
 <div id="link"></div><div id="acts"></div></section>
 <section><h2>Caller locations</h2><div id="map"></div></section>
-<section><h2>Recent links</h2><div class="tbl"><table><thead><tr><th>Caller</th><th>Status</th><th>Location</th><th>Time</th></tr></thead><tbody id="rows"></tbody></table></div>
+<section><div class="top"><h2>Recent links</h2><button id="clr" class="ghost">Delete all</button></div><div class="tbl"><table><thead><tr><th>Caller</th><th>Status</th><th>Location</th><th>Time</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
 <p style="color:var(--mut);font-size:13px">Links expire after 15 minutes and work once.</p></section>
 </main>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="dlg">
+<h3 id="mt"></h3><p id="mx"></p>
+<div class="row"><button id="mc" class="alt">Cancel</button><button id="my">Delete</button></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 var $=function(i){return document.getElementById(i)},key=sessionStorage.getItem("k")||"",map,layer,timer;
@@ -61,6 +69,16 @@ function poll(){api("/api/list").then(function(r){return r.json()}).then(functio
    if(!seen[x.id]){seen[x.id]=1;map.setView([x.lat,x.lon],16);document.title="Location received";}}
 
   var st={sent:"Sent",opened:"Opened",received:"Location received"}[x.status];
-  h+="<tr><td>"+esc(x.label||x.phone||x.id)+'</td><td class="s '+x.status+'">'+st+"</td><td>"+w+"</td><td>"+new Date(x.created).toLocaleTimeString()+"</td></tr>"});
- $("rows").innerHTML=h||'<tr><td colspan="4">No links yet. Create one above.</td></tr>'})}
+  h+="<tr><td>"+esc(x.label||x.phone||x.id)+'</td><td class="s '+x.status+'">'+st+"</td><td>"+w+"</td><td>"+new Date(x.created).toLocaleTimeString()+'</td><td><button class="ghost del" data-id="'+esc(x.id)+'">Delete</button></td></tr>'});
+ $("rows").innerHTML=h||'<tr><td colspan="5">No links yet. Create one above.</td></tr>'})}
+var pending=null;
+function ask(t,x,fn){$("mt").textContent=t;$("mx").textContent=x;pending=fn;$("modal").style.display="flex";$("mc").focus()}
+function closeM(){$("modal").style.display="none";pending=null}
+$("mc").onclick=closeM;
+$("my").onclick=function(){var f=pending;closeM();if(f)f()};
+$("modal").onclick=function(e){if(e.target===this)closeM()};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
+$("rows").onclick=function(e){var b=e.target.closest(".del");if(!b)return;var id=b.getAttribute("data-id");
+ ask("Delete this link?","The link stops working and any location it received is removed. This cannot be undone.",function(){api("/api/delete",{id:id}).then(poll)})};
+$("clr").onclick=function(){ask("Delete all links?","Every link and location in this list will be removed. This cannot be undone.",function(){api("/api/delete",{all:true}).then(poll)})};
 </script></body></html>
