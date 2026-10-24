@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Silang Alert: locate caller</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--ink:#12263A;--mut:#5B6B7B;--red:#D6392B;--ok:#1F7A55;--bg:#F7F8FA;--line:#D9E0E6}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--ink);color:#fff;padding:14px 20px;font-size:18px;font-weight:600}
+main{max-width:980px;margin:auto;padding:20px;display:grid;gap:20px}
+section{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font-size:17px;margin:0 0 12px}label{display:block;font-size:14px;color:var(--mut);margin-bottom:10px}
+input{display:block;width:100%;padding:11px;font-size:16px;border:1px solid #B8C2CC;border-radius:8px;margin-top:4px}
+button,.btn{display:inline-block;padding:11px 16px;font-size:15px;font-weight:600;border:0;border-radius:8px;background:var(--red);color:#fff;cursor:pointer;text-decoration:none;margin:4px 6px 0 0}
+.alt{background:var(--ink)}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+#link{word-break:break-all;background:var(--bg);padding:10px;border-radius:8px;margin:10px 0;display:none}
+#map{height:340px;border-radius:8px}table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line)}.tbl{overflow-x:auto}
+.s{font-weight:600}.s.received{color:var(--ok)}.s.sent{color:var(--mut)}.s.opened{color:#9A6B00}
+#login{max-width:340px;margin:60px auto}
+</style></head><body>
+<header>Silang Alert: locate caller</header>
+<main id="login"><section><h2>Staff sign in</h2>
+<label>Password<input id="pw" type="password" autocomplete="current-password"></label>
+<button id="in">Sign in</button><p id="lerr" style="color:var(--red)"></p></section></main>
+<main id="app" style="display:none">
+<section><h2>Send a location link</h2>
+<label>Caller name or note<input id="label" placeholder="Maria, Purok 3 flooding"></label>
+<label>Caller phone number (optional)<input id="phone" type="tel" placeholder="09171234567"></label>
+<button id="gen">Create link</button>
+<div id="link"></div><div id="acts"></div></section>
+<section><h2>Caller locations</h2><div id="map"></div></section>
+<section><h2>Recent links</h2><div class="tbl"><table><thead><tr><th>Caller</th><th>Status</th><th>Location</th><th>Time</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p style="color:var(--mut);font-size:13px">Links expire after 15 minutes and work once.</p></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+var $=function(i){return document.getElementById(i)},key=sessionStorage.getItem("k")||"",map,layer,timer;
+function esc(s){var d=document.createElement("div");d.textContent=s==null?"":s;return d.innerHTML}
+function api(p,body){return fetch(p,{method:body?"POST":"GET",headers:{"Content-Type":"application/json","x-staff-key":key},body:body?JSON.stringify(body):undefined})}
+function start(){$("login").style.display="none";$("app").style.display="grid";
+ map=L.map("map").setView([14.2306,120.9770],13);
+ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+ layer=L.layerGroup().addTo(map);poll();timer=setInterval(poll,3000)}
+$("in").onclick=function(){key=$("pw").value;api("/api/list").then(function(r){
+ if(r.ok){sessionStorage.setItem("k",key);start()}else $("lerr").textContent="Wrong password."})};
+if(key)api("/api/list").then(function(r){if(r.ok)start()});
+$("gen").onclick=function(){api("/api/create",{label:$("label").value,phone:$("phone").value}).then(function(r){return r.json()}).then(function(d){
+ if(!d.id)return;var url=location.origin+"/s/"+d.id,msg="Barangay Silang: tap to share your location for help: "+url;
+ var l=$("link");l.style.display="block";l.textContent=url;
+ var sms="sms:"+$("phone").value.replace(/[^\d+]/g,"")+"?&body="+encodeURIComponent(msg);
+ $("acts").innerHTML='<a class="btn" href="'+sms+'">Text this link</a>';
+ var c=document.createElement("button");c.className="alt";c.textContent="Copy link";
+ c.onclick=function(){navigator.clipboard.writeText(url);c.textContent="Copied"};$("acts").appendChild(c);poll()})};
+var seen={};
+function poll(){api("/api/list").then(function(r){return r.json()}).then(function(list){
+ layer.clearLayers();var pts=[],h="";
+ list.forEach(function(x){
+  var w="Waiting for caller";
+  if(x.lat!=null){w='<a href="https://www.google.com/maps?q='+x.lat+','+x.lon+'" target="_blank" rel="noopener">'+x.lat.toFixed(5)+', '+x.lon.toFixed(5)+'</a> (+/-'+x.acc+' m)';
+   var m=L.marker([x.lat,x.lon]).bindPopup(esc(x.label||"Caller")).addTo(layer);L.circle([x.lat,x.lon],{radius:x.acc||20}).addTo(layer);pts.push([x.lat,x.lon]);
+   if(!seen[x.id]){seen[x.id]=1;map.setView([x.lat,x.lon],16);document.title="Location received";}}
+  else if(x.purok)w=esc(x.purok)+" (no GPS)";
+  var st={sent:"Sent",opened:"Opened",received:"Location received"}[x.status];
+  h+="<tr><td>"+esc(x.label||x.phone||x.id)+'</td><td class="s '+x.status+'">'+st+"</td><td>"+w+"</td><td>"+new Date(x.created).toLocaleTimeString()+"</td></tr>"});
+ $("rows").innerHTML=h||'<tr><td colspan="4">No links yet. Create one above.</td></tr>'})}
+</script></body></html>

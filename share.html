@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Share your location</title>
+<style>
+:root{--ink:#12263A;--mut:#5B6B7B;--red:#D6392B;--ok:#1F7A55;--bg:#F7F8FA}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+main{max-width:440px;margin:auto;padding:28px 20px}
+h1{font-size:26px;line-height:1.2;margin:0 0 10px}
+p{line-height:1.5;margin:0 0 16px}.mut{color:var(--mut);font-size:14px}
+button{width:100%;padding:18px;font-size:19px;font-weight:600;border:0;border-radius:12px;background:var(--red);color:#fff;cursor:pointer}
+button:focus-visible,select:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+select{width:100%;padding:14px;font-size:17px;margin:8px 0 12px;border-radius:10px;border:1px solid #B8C2CC}
+#fb{display:none;margin-top:20px}#msg{margin-top:18px;font-weight:600}
+.ok{color:var(--ok)}.bad{color:var(--red)}
+</style></head><body><main>
+<h1>Barangay Silang needs your location</h1>
+<p>Tap the button so responders can find you. Isang pindot lang para makita ng barangay ang lokasyon mo.</p>
+<button id="go">Share my location</button>
+<div id="fb"><p>We could not get your GPS. Choose your purok instead:</p>
+<select id="purok"></select><button id="pk">Send my purok</button></div>
+<p id="msg" role="status"></p>
+<p class="mut">Your location is used only for this emergency and shared only with barangay and MDRRMO staff (Data Privacy Act of 2012).</p>
+</main>
+<script>
+var PUROKS=["Purok 1","Purok 2","Purok 3","Purok 4","Purok 5"];
+var id=location.pathname.split("/").pop()||new URLSearchParams(location.search).get("t");
+var $=function(i){return document.getElementById(i)};
+PUROKS.forEach(function(p){var o=document.createElement("option");o.textContent=p;$("purok").appendChild(o)});
+function say(t,c){$("msg").textContent=t;$("msg").className=c||""}
+function post(d){d.id=id;return fetch("/api/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)})}
+function done(r){if(r.ok){say("Sent. Stay where you are, help is on the way.","ok");$("go").style.display=$("fb").style.display="none"}
+ else if(r.status===410)say("This link expired. Please ask the barangay for a new one.","bad")
+ else if(r.status===409)say("This link was already used.","bad")
+ else say("Could not send. Please tell the barangay on the phone.","bad")}
+post({action:"open"});
+$("go").onclick=function(){
+ say("Getting your location...");
+ if(!navigator.geolocation){$("fb").style.display="block";say("");return}
+ navigator.geolocation.getCurrentPosition(function(p){
+  post({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy}).then(done).catch(done)
+ },function(){say("");$("fb").style.display="block"},{enableHighAccuracy:true,timeout:20000,maximumAge:0})};
+$("pk").onclick=function(){post({purok:$("purok").value}).then(done).catch(done)};
+</script></body></html>
