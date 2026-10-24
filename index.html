@@ -56,10 +56,10 @@ function poll(){api("/api/list").then(function(r){return r.json()}).then(functio
  layer.clearLayers();var pts=[],h="";
  list.forEach(function(x){
   var w="Waiting for caller";
-  if(x.lat!=null){w='<a href="https://www.google.com/maps?q='+x.lat+','+x.lon+'" target="_blank" rel="noopener">'+x.lat.toFixed(5)+', '+x.lon.toFixed(5)+'</a> (+/-'+x.acc+' m)';
+  if(x.lat!=null){w='<a href="https://www.google.com/maps?q='+x.lat+','+x.lon+'" target="_blank" rel="noopener">'+x.lat.toFixed(6)+', '+x.lon.toFixed(6)+'</a> (+/-'+x.acc+' m)';
    var m=L.marker([x.lat,x.lon]).bindPopup(esc(x.label||"Caller")).addTo(layer);L.circle([x.lat,x.lon],{radius:x.acc||20}).addTo(layer);pts.push([x.lat,x.lon]);
    if(!seen[x.id]){seen[x.id]=1;map.setView([x.lat,x.lon],16);document.title="Location received";}}
-  else if(x.purok)w=esc(x.purok)+" (no GPS)";
+
   var st={sent:"Sent",opened:"Opened",received:"Location received"}[x.status];
   h+="<tr><td>"+esc(x.label||x.phone||x.id)+'</td><td class="s '+x.status+'">'+st+"</td><td>"+w+"</td><td>"+new Date(x.created).toLocaleTimeString()+"</td></tr>"});
  $("rows").innerHTML=h||'<tr><td colspan="4">No links yet. Create one above.</td></tr>'})}
